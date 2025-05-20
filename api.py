@@ -1,39 +1,55 @@
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_restful import Resource, Api, reqparse, fields, marshal_with, abort
+from datetime import datetime, timezone
+from flask_cors import CORS
 
 app = Flask(__name__)
+CORS(app, resources={r"/api/*": {"origins": "*"}})
+datetime.now(timezone.utc)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
 db = SQLAlchemy(app)
 api = Api(app)
 
 class DroneModel(db.Model):
     id = db.Column(db.Integer, primary_key=True)
+    time = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    distanceCm = db.Column(db.Float, nullable=False)
+    minDistance = db.Column(db.Float, nullable=False)
+    maxDistance = db.Column(db.Float, nullable=False)
+    lot = db.Column(db.Float, nullable=False)
     lat = db.Column(db.Float, nullable=False)
-    lon = db.Column(db.Float, nullable=False)
-    distance = db.Column(db.Float, nullable=False)
-    height_min = db.Column(db.Float, nullable=False)
-    height_max = db.Column(db.Float, nullable=False)
 
     def __repr__(self):
-        return f"Drone(lat = {self.lat}, lon = {self.lon}, distance={self.distance}, height_min={self.height_min}, height_max={self.height_max})"
-        
+        return (f"Drone(time={self.time}, distanceCm={self.distanceCm}, "
+                f"minDistance={self.minDistance}, maxDistance={self.maxDistance}, "
+                f"lot={self.lot}, lat={self.lat})")
+
+def parse_datetime(value):
+    try:
+        return datetime.strptime(value, "%Y.%d.%m.%H:%M")
+    except ValueError:
+        raise ValueError("time must be in format YYYY.DD.MM.HH:MM")        
 
 drone_args = reqparse.RequestParser()
+drone_args.add_argument('time', type=parse_datetime, required=False)
+drone_args.add_argument('distanceCm', type=float, required=True)
+drone_args.add_argument('minDistance', type=float, required=True)
+drone_args.add_argument('maxDistance', type=float, required=True)
+drone_args.add_argument('lot', type=float, required=True)
 drone_args.add_argument('lat', type=float, required=True)
-drone_args.add_argument('lon', type=float, required=True)
-drone_args.add_argument('distance', type=float, required=True)
-drone_args.add_argument('height_min', type=float, required=True)
-drone_args.add_argument('height_max', type=float, required=True)
+
 
 droneFields = {
-    'id':fields.Integer,
-    'lat':fields.Float,
-    'lon':fields.Float,
-    'distance':fields.Float,
-    'height_min':fields.Float,
-    'height_max':fields.Float,
+    'id': fields.Integer,
+    'time': fields.DateTime,
+    'distanceCm': fields.Float,
+    'minDistance': fields.Float,
+    'maxDistance': fields.Float,
+    'lot': fields.Float,
+    'lat': fields.Float
 }
+
 
 class Drone(Resource):
     @marshal_with(droneFields)
@@ -44,7 +60,7 @@ class Drone(Resource):
     @marshal_with(droneFields)
     def post(self):
         args = drone_args.parse_args()
-        drone = DroneModel(lat=args["lat"], lon=args["lon"], distance=args["distance"], height_min=args["height_min"], height_max=args["height_max"])
+        drone = DroneModel(time=args["time"] if args["time"] else datetime.now(timezone.utc), distanceCm=args["distanceCm"], minDistance=args["minDistance"], maxDistance=args["maxDistance"], lot=args["lot"], lat=args["lat"])
         db.session.add(drone)
         db.session.commit()
         drone_data = DroneModel.query.all()
@@ -74,8 +90,9 @@ class DroneHeightDiff(Resource):
         if not drone:
             abort(404, message="Drone data not found")
         
-        height_diff = drone.height_max - drone.height_min
+        height_diff = drone.maxDistance - drone.minDistance
         return {"id": id, "height_difference": height_diff}, 200
+
 
     
 api.add_resource(Drone, '/api/drone_data/')
