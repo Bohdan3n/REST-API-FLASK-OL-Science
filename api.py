@@ -22,11 +22,12 @@ class DroneModel(db.Model):
     x = db.Column(db.Float, nullable=False)
     y = db.Column(db.Float, nullable=False)
     z = db.Column(db.Float, nullable=False)
+    magnetic = db.Column(db.Float, nullable=True)
 
     def __repr__(self):
         return (f"Drone(time={self.time}, distanceCm={self.distanceCm}, "
                 f"minDistance={self.minDistance}, maxDistance={self.maxDistance}, "
-                f"lot={self.lot}, lat={self.lat}), x={self.x}, y={self.y}, y={self.y}")
+                f"lot={self.lot}, lat={self.lat}), x={self.x}, y={self.y}, z={self.z}, magnetic={self.magnetic}")
 
 def parse_datetime(value):
     try:
@@ -44,6 +45,7 @@ drone_args.add_argument('lat', type=float, required=True)
 drone_args.add_argument('x', type=float, required=True)
 drone_args.add_argument('y', type=float, required=True)
 drone_args.add_argument('z', type=float, required=True)
+drone_args.add_argument('magnetic', type=float, required=False)
 
 droneFields = {
     'id': fields.Integer,
@@ -55,7 +57,8 @@ droneFields = {
     'lat': fields.Float,
     'x': fields.Float,
     'y': fields.Float,
-    'z': fields.Float
+    'z': fields.Float,
+    'magnetic': fields.Float
 }
 
 
@@ -68,7 +71,7 @@ class Drone(Resource):
     @marshal_with(droneFields)
     def post(self):
         args = drone_args.parse_args()
-        drone = DroneModel(time=args["time"] if args["time"] else datetime.now(timezone.utc), distanceCm=args["distanceCm"], minDistance=args["minDistance"], maxDistance=args["maxDistance"], lot=args["lot"], lat=args["lat"], x=args["x"], y=args["y"], z=args["z"])
+        drone = DroneModel(time=args["time"] if args["time"] else datetime.now(timezone.utc), distanceCm=args["distanceCm"], minDistance=args["minDistance"], maxDistance=args["maxDistance"], lot=args["lot"], lat=args["lat"], x=args["x"], y=args["y"], z=args["z"], magnetic=args["magnetic"])
         db.session.add(drone)
         db.session.commit()
         drone_data = DroneModel.query.all()
